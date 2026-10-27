@@ -32,6 +32,8 @@ const ASSET_EXT: &[&str] = &[
     "obj",
     "fcstd",
     "3dm",
+    "f3d",
+    "f3z",
 ];
 
 fn walk(dir: &Path, root: &Path, out: &mut Vec<String>) -> Result<(), String> {

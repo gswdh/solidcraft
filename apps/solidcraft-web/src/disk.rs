@@ -349,7 +349,24 @@ mod web {
         let options = Object::new();
         let _ = Reflect::set(&options, &"multiple".into(), &JsValue::FALSE);
         let extensions = Array::new();
-        for e in [".solidcraft", ".solvecraft", ".json", ".step", ".stp", ".3mf", ".stl", ".obj", ".glb", ".gltf", ".fcstd", ".3dm", ".dxf", ".svg"] {
+        for e in [
+            ".solidcraft",
+            ".solvecraft",
+            ".json",
+            ".step",
+            ".stp",
+            ".3mf",
+            ".stl",
+            ".obj",
+            ".glb",
+            ".gltf",
+            ".fcstd",
+            ".3dm",
+            ".f3d",
+            ".f3z",
+            ".dxf",
+            ".svg",
+        ] {
             extensions.push(&e.into());
         }
         let accept = Object::new();

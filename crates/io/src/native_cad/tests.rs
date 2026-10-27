@@ -30,10 +30,14 @@ fn imports_the_block(bytes: &[u8], file: &str) {
 #[test]
 fn extensions() {
     assert!(is_native_cad_path("a/Part.FCStd") && is_native_cad_path("x.3DM") && is_native_cad_path("y.fcstd"));
-    for other in ["c.sat", "c.sab", "c.smt", "c.smb", "c.f3d", "c.sldprt", "c.step", "fcstd"] {
+    assert!(is_native_cad_path("p.f3d") && is_native_cad_path("p.F3Z"));
+    for other in ["c.sat", "c.sab", "c.smt", "c.smb", "c.f2d", "c.sldprt", "c.step", "fcstd", "f3d"] {
         assert!(!is_native_cad_path(other), "{other}");
     }
-    assert!(crate::is_step_path("c.FCStd") && crate::is_step_path("c.3dm"), "read as an Import feature like STEP and IGES");
+    assert!(
+        crate::is_step_path("c.FCStd") && crate::is_step_path("c.3dm") && crate::is_step_path("c.f3z"),
+        "read as an Import feature like STEP and IGES"
+    );
 }
 
 #[test]
@@ -50,13 +54,16 @@ fn rhino_box_imports_as_a_solid() {
     imports_the_block(bytes, "block.3dm");
 }
 
-/// Only FreeCAD and Rhino contents are read: STEP text, garbage, a bad ZIP and empty input are
-/// refused with a message, as are ACIS, ShapeManager and commercial formats whatever their bytes.
+/// Only FreeCAD, Rhino and Fusion contents are read: STEP text, garbage, a bad ZIP and empty
+/// input are refused with a message, as are ACIS, ShapeManager and other commercial formats
+/// whatever their bytes. (No Fusion fixture is committed: cadmpeg 0.6.6 cannot yet write a
+/// source-less `.f3d`, and the project holds no file made with Fusion; a Fusion file is read
+/// through the same `decode` and STEP restatement as the two fixtures.)
 #[test]
 fn other_contents_are_refused() {
     let step = STEP_TEXT;
     let fcstd = BLOCK_FCSTD;
-    let cases: [(&[u8], &str); 9] = [
+    let cases: [(&[u8], &str); 11] = [
         (step.as_bytes(), "x.3dm"),
         (step.as_bytes(), "x.fcstd"),
         (b"\0\0garbage", "x.3dm"),
@@ -64,7 +71,9 @@ fn other_contents_are_refused() {
         (b"", "x.3dm"),
         (b"700 0 1 0\n", "x.sat"),
         (b"ASM BinaryFile4", "x.smb"),
-        (fcstd, "x.f3d"),
+        (b"ASM BinaryFile4", "x.f3d"),
+        (b"PK\x03\x04junk", "x.f3d"),
+        (b"PK\x03\x04junk", "x.f3z"),
         (fcstd, "x.sldprt"),
     ];
     for (bytes, name) in cases {
@@ -73,6 +82,50 @@ fn other_contents_are_refused() {
     }
     // A Rhino file named .FCStd is still read as what it is.
     imports_the_block(BLOCK_3DM, "renamed.FCStd");
+}
+
+/// A `.f3z` archive as Fusion writes one: `Manifest.json` names the root member and
+/// `DesignDescription.json` the documents, their kinds, names and references. `root` is a
+/// drawing that derives from the `Part` design; `Body` is a design the part links.
+fn f3z(root: &str, part_bytes: &[u8]) -> Vec<u8> {
+    use std::io::Write;
+    let description = serde_json::json!({"designDescription": {"designGraphs": [{"designObjects": [
+        {"id": 1, "relativePath": "d.f2d", "contentType": "f2d", "friendlyName": "Part Drawing",
+         "references": [{"type": "DERIVED", "ids": [2]}]},
+        {"id": 2, "relativePath": "a.f3d", "contentType": "f3d", "friendlyName": "Part",
+         "references": [{"type": "XREF", "ids": [3]}]},
+        {"id": 3, "relativePath": "b.f3d", "contentType": "f3d", "friendlyName": "Body", "references": []},
+    ]}]}});
+    let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+    let plain = zip::write::SimpleFileOptions::default();
+    for (name, bytes) in [
+        ("Manifest.json", format!("{{\"root\":\"{root}\"}}").into_bytes()),
+        ("DesignDescription.json", description.to_string().into_bytes()),
+        ("d.f2d", b"PK\x03\x04drawing".to_vec()),
+        ("a.f3d", part_bytes.to_vec()),
+        ("b.f3d", b"PK\x03\x04body".to_vec()),
+    ] {
+        zip.start_file(name, plain).unwrap();
+        zip.write_all(&bytes).unwrap();
+    }
+    zip.finish().unwrap().into_inner()
+}
+
+/// The root design of a `.f3z`, read when cadmpeg cannot take the archive as one model: a
+/// drawing root stands for the design it derives from, and the linked designs are named.
+#[test]
+fn f3z_root_design_follows_the_manifest() {
+    let (member, bytes, linked) = f3z_root_design(&f3z("d.f2d", b"PART")).unwrap();
+    assert_eq!((member.as_str(), bytes.as_slice(), linked), ("Part.f3d", &b"PART"[..], vec!["Body".to_string()]));
+    let (member, _, linked) = f3z_root_design(&f3z("b.f3d", b"PART")).unwrap();
+    assert_eq!((member.as_str(), linked), ("Body.f3d", vec!["Part".to_string()]));
+    for (bad, what) in [(&b"PK\x03\x04junk"[..], "not a zip"), (b"", "empty"), (&f3z("missing.f3d", b"")[..], "root not listed")] {
+        assert!(f3z_root_design(bad).is_err(), "{what}");
+    }
+    // Through the importer: the root design's bytes are not a Fusion file either, so the error
+    // names the archive and says the root design was tried alone.
+    let e = native_cad_to_step(&f3z("d.f2d", b"PART"), "x.f3z").expect_err("no geometry");
+    assert!(e.starts_with("x.f3z: could not read this f3z archive") && e.contains("root design Part.f3d alone"), "{e}");
 }
 
 /// Truncated, bit-flipped and garbage-tailed variants of valid FreeCAD and Rhino files give an

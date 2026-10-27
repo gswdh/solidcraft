@@ -26,7 +26,7 @@ serde_json = { workspace = true, features = ["raw_value"] }
 sha2 = { workspace = true }
 chardetng = { workspace = true }
 encoding_rs = { workspace = true }
-# FreeCAD and Rhino import (pure Rust, so the browser build has it too).
+# FreeCAD, Rhino and Fusion import (pure Rust, so the browser build has it too).
 cadmpeg-core = { workspace = true }
 cadmpeg-ir = { workspace = true }
 cadmpeg-registry = { workspace = true }

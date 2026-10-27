@@ -620,14 +620,15 @@ in THIRD-PARTY-LICENSES.txt; no images or artwork from that project are copied.
 The glTF test files are built by the tests themselves (crates/io/src/gltf_in_tests.rs,
 crates/engine/src/tests/gltf_import.rs); no third-party models are committed.
 
-## FreeCAD and Rhino import library
+## FreeCAD, Rhino and Fusion import library
 
-FreeCAD `.FCStd` and Rhino `.3dm` files are read with [cadmpeg](https://github.com/cadmpeg/cadmpeg)
-0.6.3 (Apache-2.0), linked as the crates `cadmpeg-core`, `cadmpeg-ir`, `cadmpeg-registry`,
-`cadmpeg-container`, `cadmpeg-codec-freecad`, `cadmpeg-codec-rhino` and `cadmpeg-codec-step`
-in native and browser builds (`crates/io/src/native_cad.rs`). Only those open-format codecs are built: no
-default features, so cadmpeg's codecs for commercial CAD formats and its ShapeManager/ACIS
-codec are not compiled in. Its licence text is in THIRD-PARTY-LICENSES.txt; no code from it is
+FreeCAD `.FCStd`, Rhino `.3dm` and Fusion `.f3d`/`.f3z` files are read with
+[cadmpeg](https://github.com/cadmpeg/cadmpeg) 0.6.6 (Apache-2.0), linked as the crates
+`cadmpeg-core`, `cadmpeg-ir`, `cadmpeg-registry`, `cadmpeg-container`, `cadmpeg-asm`,
+`cadmpeg-protein`, `cadmpeg-codec-freecad`, `cadmpeg-codec-rhino`, `cadmpeg-codec-f3d` and
+`cadmpeg-codec-step` in native and browser builds (`crates/io/src/native_cad.rs`). Only those
+codecs are built: no default features, so cadmpeg's other commercial-format codecs and its
+ShapeManager/ACIS codec are not compiled in. Its licence text is in THIRD-PARTY-LICENSES.txt; no code from it is
 copied into SolidCraft.
 
 ## Recovered contributions

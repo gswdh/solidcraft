@@ -45,7 +45,7 @@ pub struct ImportSpec {
     /// Options offered at import time; each `param` is a parameter of `doc.open` and of the
     /// matching `file.insert_*` command.
     pub options: &'static [OptionSpec],
-    /// Read through cadmpeg (FreeCAD `.FCStd`, Rhino `.3dm`). Every current host builds it;
+    /// Read through cadmpeg (FreeCAD `.FCStd`, Rhino `.3dm`, Fusion `.f3d`/`.f3z`). Every current host builds it;
     /// `native = false` leaves these rows out for a host that cannot.
     pub native_only: bool,
 }
@@ -216,6 +216,14 @@ pub static FORMATS: &[FormatSpec] = &[
         export: None,
     },
     FormatSpec {
+        id: "f3d",
+        label: "Fusion",
+        extensions: &["f3d", "f3z"],
+        role: Role::Artifact,
+        import: Some(ImportSpec { target: ImportTarget::Brep, options: BREP_IMPORT, native_only: true }),
+        export: None,
+    },
+    FormatSpec {
         id: "stl",
         label: "STL",
         extensions: &["stl"],
@@ -371,7 +379,7 @@ pub fn import_filters(native: bool) -> Vec<(&'static str, Vec<&'static str>)> {
         let Some(import) = f.import.as_ref() else { continue };
         match import.target {
             ImportTarget::Design => add("SolidCraft design (container or JSON)", f.extensions),
-            ImportTarget::Brep if import.native_only => add("FreeCAD and Rhino", f.extensions),
+            ImportTarget::Brep if import.native_only => add("FreeCAD, Rhino and Fusion", f.extensions),
             ImportTarget::Brep => add(f.label, f.extensions),
             ImportTarget::Mesh => add("Mesh (3MF, STL, OBJ, glTF)", f.extensions),
             ImportTarget::Sketch => add("Sketch drawings (DXF, SVG)", f.extensions),
@@ -410,7 +418,7 @@ mod tests {
         for e in with_target(ImportTarget::Brep) {
             assert!(crate::is_step_path(&format!("part.{e}")), "is_step_path misses .{e}");
         }
-        for e in ["step", "stp", "igs", "iges", "fcstd", "3dm"] {
+        for e in ["step", "stp", "igs", "iges", "fcstd", "3dm", "f3d", "f3z"] {
             assert!(with_target(ImportTarget::Brep).contains(&e), "registry misses B-rep .{e}");
         }
         for e in with_target(ImportTarget::Mesh) {
@@ -460,7 +468,8 @@ mod tests {
         assert!(importable(true).any(|f| f.id == "fcstd"));
         assert!(open_extensions(true).contains(&"fcstd"));
         assert!(open_extensions(true).contains(&"3dm"));
-        assert!(importable(false).all(|f| f.id != "fcstd" && f.id != "3dm"));
+        assert!(open_extensions(true).contains(&"f3z"));
+        assert!(importable(false).all(|f| f.id != "fcstd" && f.id != "3dm" && f.id != "f3d"));
         assert!(!open_extensions(false).contains(&"fcstd"));
         assert!(open_extensions(false).contains(&"igs"));
     }
@@ -473,9 +482,9 @@ mod tests {
         assert_eq!(find("SolidCraft design (container or JSON)"), vec![crate::DESIGN_EXT, crate::LEGACY_DESIGN_EXT, "json"]);
         assert_eq!(find("STEP"), vec!["step", "stp"]);
         assert_eq!(find("IGES"), vec!["igs", "iges"]);
-        assert_eq!(find("FreeCAD and Rhino"), vec!["fcstd", "3dm"]);
+        assert_eq!(find("FreeCAD, Rhino and Fusion"), vec!["fcstd", "3dm", "f3d", "f3z"]);
         assert_eq!(find("Mesh (3MF, STL, OBJ, glTF)"), vec!["stl", "3mf", "obj", "glb", "gltf"]);
         assert_eq!(find("Sketch drawings (DXF, SVG)"), vec!["dxf", "svg"]);
-        assert!(import_filters(false).iter().all(|(l, _)| *l != "FreeCAD and Rhino"));
+        assert!(import_filters(false).iter().all(|(l, _)| *l != "FreeCAD, Rhino and Fusion"));
     }
 }
